@@ -9,7 +9,7 @@ keys = df.keys()
 x = df[keys[5]].values
 y = df[keys[6]].values
 
-hardnesses = df[keys[7]].values
+hardnesses = df[keys[9]].values
 
 x_unique = np.unique(x)
 y_unique = np.unique(y)
@@ -40,16 +40,35 @@ for x_value in x:
 wb = Workbook()
 ws = wb.active   
 
+ws.title = "Map"
 
-first_row_list = map[0].tolist()
 
+# append the x values to the top row of the excel sheet
+first_row_list = y_unique.tolist()
+
+# place a blank cell top left
 first_row_list.insert(0, " ")
 
+# Write it to the sheet
 ws.append(first_row_list)
 
+for x_inc, row in zip(x_unique, map):
+
+    row_list = row.tolist()
+    row_list.insert(0, x_inc)
+    ws.append(row_list)
+
+
+
+ws2 = wb.create_sheet("Original")
+
+original_data = df.values
+
+ws2.append(df.keys().to_list())
+for row in original_data:
+    ws2.append(row.tolist())
+
+# Save the sheet
 wb.save("test.xlsx")
-
-
-
 
 

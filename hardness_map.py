@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from openpyxl import Workbook
 import os
+import seaborn as sns
 
 DEFAULT_X_COLUMN_INT = 5
 DEFAULT_Y_COLUMN_INT = 6
@@ -30,6 +31,12 @@ class HardnessMap:
         if not self.file_ext == ".csv":
             print(f"\nWarning: the filename you specified ({self.input_filename}) is not a .csv file.\n")
 
+
+        # ===================================================
+
+        self.data_extracted = False
+        self.hardness_map_created = False
+        self.saved_to_excel = False
 
     def get_data(self, encoding='utf-16', delineator='\t', header_row=0):    
 
@@ -64,8 +71,9 @@ class HardnessMap:
         # Instantiate the hardness map array. At this point, it will all zeros
         self.hardness_map = np.zeros([self.x_length, self.y_length])
 
-        
+        self.data_extracted = True
 
+        
     def __default_column_verification__(self):
         
         self.x_column = DEFAULT_X_COLUMN_INT
@@ -131,9 +139,18 @@ class HardnessMap:
         return x_found * y_found * hardness_found        
     
 
-    def get_hardness_map(self):
+    def create_hardness_map(self):
 
-        # Iterate through the unique x values
+       # Check if data has been extracted from the input file
+       if not self.data_extracted:
+           print("\nWarning: The get_data method has not yet been called. " + \
+                 "Hence, there is no data to generate the hardness map. Call " + \
+                 "the get_data method before calling this method.\n")
+           
+           return
+                
+
+       # Iterate through the unique x values
        for i, x_value in enumerate(self.x_unique):
     
             # The indices of the values where x is equal to the x value in this iteration 
@@ -154,8 +171,17 @@ class HardnessMap:
                 # Assign these values to the hardness map
                 self.hardness_map[i, j] = hardness_value
 
+       self.hardness_map_created = True 
 
     def save_to_excel(self, save_original_data=True, save_filename="", extension=".xlsx"):
+
+        # Check if the hardness map has been generated
+        if not self.hardness_map_created:
+           print("\nWarning: The create_hardness_map method has not yet been called. " + \
+                 "Hence, there is not currently a hardness map to save. Call " + \
+                 "the create_hardness_map method before calling this method.\n")
+           
+           return
 
         self.save_extension = extension
         self.__save_extension_validation__()
@@ -204,6 +230,9 @@ class HardnessMap:
         # Save the sheet
         wb.save(self.save_filename)
 
+        self.saved_to_excel = True
+
+
     def __save_extension_validation__(self):
 
         # If the user specifies an extension that does not have a fullstop at the start, add one
@@ -213,3 +242,17 @@ class HardnessMap:
         if len(self.save_extension) < 3 or len(self.save_extension.split(".")) > 2:
             print(f"\nWarning: the extension you specified for saving ({self.save_extension}) may not be valid. Consider review.\n")
     
+
+    def display_hardness_map(self):
+
+        # Check if the hardness map has been generated
+        if not self.hardness_map_created:
+           print("\nWarning: The create_hardness_map method has not yet been called. " + \
+                 "Hence, there is not currently a hardness map to display. Call " + \
+                 "the create_hardness_map method before calling this method.\n")
+           
+           return
+
+        sns.heatmap(self.hardness_map)
+
+        # TODO - convert hardness_map into a dataframe or this doesn't work

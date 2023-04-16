@@ -3,14 +3,83 @@ import numpy as np
 from openpyxl import Workbook
 import os
 import seaborn as sns
+import matplotlib.pyplot as plt
+import ntpath
 
 DEFAULT_X_COLUMN_INT = 5
 DEFAULT_Y_COLUMN_INT = 6
 DEFAULT_HARDNESS_COLUMN_INT = 9
 
+def multiple_hardness_maps(input_folder_path, output_folder_path="Outputs", save_excel=True, save_image=True, axis_labels=True, vrange='default'):
+    
+    # Validate the input and output parameter
+    validation = path_validation(input_folder_path, output_folder_path)
+    
+    # If valid, continue
+    if validation:
+        
+        input_folder = validation[0]
+        output_folder = validation[1]
+
+        # Iterate through the files in the input folder
+        for file in os.listdir(input_folder):
+            
+            # If it is a .csv file, continue
+            if file.endswith('.csv'):
+
+                # Instantiate the hardness map object and call the methods to get and process the data
+                hardness_map = HardnessMap(os.path.join(input_folder, file), output_folder)
+                hardness_map.get_data()
+                hardness_map.create_hardness_map()
+
+                if save_excel:
+                   hardness_map.save_to_excel()
+
+                if save_image:
+                    hardness_map.display_hardness_map(axis_labels=axis_labels, vrange=vrange)
+
+
+                
+
+
+
+
+
+def path_validation(input_folder_path, output_folder_path):
+
+    # Check if input_folder_path is absolute
+    if not os.path.isabs(input_folder_path):
+        input_folder_path = os.path.join(os.getcwd(), input_folder_path) # If not, add the current working directory to it
+
+    # Check if specified input folder exists
+    if os.path.isdir(input_folder_path):
+       
+       # Check if specified input folder contains .csv files
+       if not any(fname.endswith('.csv') for fname in os.listdir(input_folder_path)):
+           print(f"Warning: the path to the folder of inputs ({input_folder_path}) does not contain .csv files. Please check and try again.")
+           return False
+       
+       # Check if output_folder_path is absolute
+       if not os.path.isabs(output_folder_path):
+          
+          # If not, assume it is in the parent directory to input_folder_path 
+          working_folder = os.path.dirname(input_folder_path)
+          output_folder_path = os.path.join(working_folder, output_folder_path)
+
+       # If the output_folder_path doesn't exist, create the folder
+       if not os.path.isdir(output_folder_path):
+           os.mkdir(output_folder_path)
+
+
+    else:
+        print(f"Warning: the path to the folder of inputs ({input_folder_path}) does not exist. Please check and try again.") 
+        return False
+
+    return input_folder_path, output_folder_path        
+
 class HardnessMap:
 
-    def __init__(self, input_filename):
+    def __init__(self, input_filename, output_folder=""):
 
         self.input_filename = input_filename
 
@@ -31,6 +100,8 @@ class HardnessMap:
         if not self.file_ext == ".csv":
             print(f"\nWarning: the filename you specified ({self.input_filename}) is not a .csv file.\n")
 
+        # The folder to save any outputs to
+        self.output_folder = output_folder
 
         # ===================================================
 
@@ -63,6 +134,10 @@ class HardnessMap:
         # Create ordered arrays of the unique values from the x and y columns
         self.x_unique = np.unique(self.x)
         self.y_unique = np.unique(self.y)
+
+        # The width and breath of the sample
+        self.x_range = self.x_unique[-1] - self.x_unique[0]
+        self.y_range = self.y_unique[-1] - self.y_unique[0]
 
         # Count the number of uniques in x and y
         self.x_length = self.x_unique.shape[0]
@@ -188,10 +263,10 @@ class HardnessMap:
 
         # If the user does not specify a save filename, use the input filename
         if save_filename == "":
-            self.save_filename = self.filename_noext + self.save_extension
+            self.save_filename = os.path.join(self.output_folder, (ntpath.basename(self.filename_noext) + self.save_extension))
         # Else use the user specified name    
         else:
-            self.save_filename = save_filename + self.save_extension
+            self.save_filename = os.path.join(self.output_folder, (ntpath.basename(save_filename) + self.save_extension))
 
         # Instantiate the Excel workbook
         wb = Workbook()
@@ -228,6 +303,7 @@ class HardnessMap:
                 ws2.append(row.tolist())
 
         # Save the sheet
+        # print(self.save_filename)
         wb.save(self.save_filename)
 
         self.saved_to_excel = True
@@ -243,7 +319,7 @@ class HardnessMap:
             print(f"\nWarning: the extension you specified for saving ({self.save_extension}) may not be valid. Consider review.\n")
     
 
-    def display_hardness_map(self):
+    def display_hardness_map(self, axis_labels=True, vrange='default', ext=".png"):
 
         # Check if the hardness map has been generated
         if not self.hardness_map_created:
@@ -253,6 +329,45 @@ class HardnessMap:
            
            return
 
-        sns.heatmap(self.hardness_map)
+        # Create a dataframe for the data
+        # ====================================================================================
+        dict = {}
 
-        # TODO - convert hardness_map into a dataframe or this doesn't work
+        for label, row in zip(self.x_unique, self.hardness_map):
+
+           dict[str(label)] = row.tolist()
+
+        self.hardness_map_df = pd.DataFrame(dict, index=self.y_unique.tolist()).transpose()
+
+        
+        # ====================================================================================
+
+        # Specify the range for the heat bar
+        
+        if vrange == "default":
+            vmin = self.hardnesses.min()
+            vmax = self.hardnesses.max()
+
+            print(vmin)
+
+        elif type(vrange) == list and len(vrange) == 2:
+
+            vmin = vrange[0]
+            vmax = vrange[1]
+
+        else:
+            print("Warning: the values you specified for vrange are invalid. Either specify a list of integers ([min, max]) or leave as default to use min and max hardnesses.")            
+            vmin = self.hardnesses.min()
+            vmax = self.hardnesses.max()
+
+        # ====================================================================================
+
+
+        # Plot the actual graph
+        sns.heatmap(self.hardness_map_df, xticklabels=axis_labels, yticklabels=axis_labels, vmin=vmin, vmax=vmax)
+
+        image_save_filename = os.path.join(self.output_folder, ntpath.basename(self.filename_noext)) + ext
+
+        plt.savefig(image_save_filename, bbox_inches='tight')
+        plt.close()
+

@@ -1,10 +1,5 @@
-from hardness_map import HardnessMap
+from hardness_map import multiple_hardness_maps
 
-hardness_map = HardnessMap("CCT_PM_0.1Cs-1.csv")
-hardness_map.get_data()
-hardness_map.create_hardness_map()
-hardness_map.save_to_excel()
-hardness_map.display_hardness_map()
 
-# print(hardness_map.hardness_map)
+multiple_hardness_maps(r"C:\Users\janus\OneDrive\Documents\HardnessMapping\inputs", "Outputs", save_excel=True, save_image=True, axis_labels=True, vrange=[100, 700])
 

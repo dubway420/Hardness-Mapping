@@ -10,7 +10,7 @@ DEFAULT_X_COLUMN_INT = 5
 DEFAULT_Y_COLUMN_INT = 6
 DEFAULT_HARDNESS_COLUMN_INT = 9
 
-def multiple_hardness_maps(input_folder_path, output_folder_path="Outputs", save_excel=True, save_image=True, axis_labels=True, vrange='default'):
+def multiple_hardness_maps(input_folder_path, output_folder_path="Outputs", threshold=None, save_excel=True, save_image=True, axis_labels=True, vrange='default'):
     
     # Validate the input and output parameter
     validation = path_validation(input_folder_path, output_folder_path)
@@ -28,7 +28,7 @@ def multiple_hardness_maps(input_folder_path, output_folder_path="Outputs", save
             if file.endswith('.csv'):
 
                 # Instantiate the hardness map object and call the methods to get and process the data
-                hardness_map = HardnessMap(os.path.join(input_folder, file), output_folder)
+                hardness_map = HardnessMap(os.path.join(input_folder, file), output_folder, threshold)
                 hardness_map.get_data()
                 hardness_map.create_hardness_map()
 
@@ -37,12 +37,6 @@ def multiple_hardness_maps(input_folder_path, output_folder_path="Outputs", save
 
                 if save_image:
                     hardness_map.display_hardness_map(axis_labels=axis_labels, vrange=vrange)
-
-
-                
-
-
-
 
 
 def path_validation(input_folder_path, output_folder_path):
@@ -79,7 +73,8 @@ def path_validation(input_folder_path, output_folder_path):
 
 class HardnessMap:
 
-    def __init__(self, input_filename, output_folder=""):
+    def __init__(self, input_filename, output_folder="", threshold=None):
+
 
         self.input_filename = input_filename
 
@@ -104,6 +99,11 @@ class HardnessMap:
         self.output_folder = output_folder
 
         # ===================================================
+
+        # validate and assign any threshold data i.e. if any data is below this value it 
+        # will be filtered out. By default this is set to None and no data will be filtered
+        self.threshold = None
+        self.__threshold_validation__(threshold)
 
         self.data_extracted = False
         self.hardness_map_created = False
@@ -248,6 +248,7 @@ class HardnessMap:
 
        self.hardness_map_created = True 
 
+
     def save_to_excel(self, save_original_data=True, save_filename="", extension=".xlsx"):
 
         # Check if the hardness map has been generated
@@ -284,7 +285,7 @@ class HardnessMap:
         ws.append(first_row_list)
 
         # Write each row of the hardness map to the Excel sheet
-        for x_inc, row in zip(self.x_unique, self.hardness_map):
+        for x_inc, row in zip(self.x_unique, self.get_hardness_map()):
 
             row_list = row.tolist()
 
@@ -333,7 +334,7 @@ class HardnessMap:
         # ====================================================================================
         dict = {}
 
-        for label, row in zip(self.x_unique, self.hardness_map):
+        for label, row in zip(self.x_unique, self.get_hardness_map()):
 
            dict[str(label)] = row.tolist()
 
@@ -371,3 +372,47 @@ class HardnessMap:
         plt.savefig(image_save_filename, bbox_inches='tight')
         plt.close()
 
+
+    def get_hardness_map(self):
+
+        """ Get the hardness map data, including any threshold filter"""
+
+        # If a data threshold has been specified, filter out all data below this value
+        if self.threshold:
+            return self.__high_pass__()
+
+        # Otherwise, just obtain the hardness map for processing
+        else:
+            return self.hardness_map
+
+        # ============================================================================
+        
+
+    def __high_pass__(self):
+
+        """ returns a hardness map which has undergone a high pass filter. This means that all values 
+        below a certain threshold will be """
+
+        # A boolean array the same shape as the hardness map. Will havea True value for all values above the threshold
+        # and will be False for all values below  
+        filter = self.hardness_map > self.threshold
+
+        # returns the filtered hardness map
+        return self.hardness_map * filter
+    
+
+    def __threshold_validation__(self, threshold):
+
+        
+        # If no threshold is specified, leave this as the default (None)
+        if not threshold:
+            return
+        
+        # If the threshold is an integer, set the object threshold to this value
+        if type(threshold) == int:
+            self.threshold = threshold
+            return
+
+        # If it is anything else, leave it as the default (None)
+        print(f"Warning: the threshold you specified ({threshold}) is invalid. Ensure it is an integer > 0. Setting to None.")
+        
